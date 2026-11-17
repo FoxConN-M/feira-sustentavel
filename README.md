@@ -22,7 +22,7 @@ O card da coordenação e o botão **Entrar como Coordenação** representam o a
 
 A coordenação seleciona um produto, informa a quantidade com o campo numérico ou os botões de incremento e acompanha o subtotal. O aplicativo verifica o saldo disponível antes do envio. A API repete a validação na gravação e atualiza o estoque dentro da transação.
 
-Sem conexão, a venda é guardada no armazenamento local do navegador. Ao voltar a ficar online, a fila é enviada em ordem cronológica. Cada venda inclui um identificador de cliente para evitar duplicidade em tentativas repetidas de sincronização.
+Sem conexão, a venda é gravada no IndexedDB do navegador e espelhada no `localStorage` como recuperação para navegadores sem IndexedDB. O Service Worker agenda Background Sync quando o navegador oferece essa API; a fila também é sincronizada ao recuperar a conexão ou abrir o aplicativo. As vendas são enviadas em ordem cronológica e usam um identificador de cliente para evitar duplicidade em tentativas repetidas.
 
 ### 3. Repasses e resultados
 
@@ -47,7 +47,7 @@ Assim, o fluxo descrito na seção anterior é uma referência de arquitetura fu
 - **API:** FastAPI com validação dos corpos de requisição por Pydantic e respostas JSON no contrato camelCase.
 - **Banco:** PostgreSQL acessado pelo SQLAlchemy 2 e driver `psycopg`.
 - **Contrato da API:** JSON com propriedades camelCase para compatibilidade com o frontend.
-- **Armazenamento offline:** cache de vitrine, catálogo e produtores no `localStorage`; fila local de vendas pendentes.
+- **Armazenamento offline:** cache de vitrine, catálogo e produtores no `localStorage`; fila de vendas no IndexedDB com espelho de compatibilidade.
 
 ## Estrutura do repositório
 
@@ -62,6 +62,8 @@ src/
   components/       Vitrine, venda, relatórios, navegação e banners
   hooks/            Estado de conectividade e instalação do PWA
   lib/offlineSync.ts Cache local e sincronização da fila offline
+  lib/backgroundQueue.ts Fila IndexedDB e transmissão reutilizada pelo Service Worker
+  sw.ts Cache PWA e evento de Background Sync das vendas pendentes
   App.tsx           Estado e navegação das três telas
 tests/
   test_api.py       Testes das rotas, estoque, relatórios e modo sem login
@@ -183,7 +185,8 @@ O script de desenvolvimento usa automaticamente `.venv/Scripts/python.exe` no Wi
 - A vitrine usa estratégia `NetworkFirst` para tentar dados recentes e recorrer ao cache quando necessário.
 - A fila de vendas fica no armazenamento local do navegador até que possa ser enviada.
 - O estoque visível no dispositivo considera as vendas pendentes para evitar apresentar o mesmo saldo como disponível.
-- O Service Worker pré-armazena os recursos do frontend e é atualizado automaticamente.
+- O Service Worker pré-armazena os recursos do frontend, mantém cache de leitura da vitrine e é atualizado automaticamente.
+- O Background Sync nativo envia a fila mesmo sem a tela aberta nos navegadores compatíveis; o evento `online` e a abertura do app funcionam como alternativas quando a API não existe. Esse recurso depende de contexto seguro (HTTPS ou localhost) e do suporte do navegador.
 - Ícones e metadados de instalação ficam em `public/` e na configuração PWA do Vite.
 
 ## Acessibilidade e uso em campo

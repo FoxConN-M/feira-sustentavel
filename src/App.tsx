@@ -17,8 +17,10 @@ import {
   saveCachedProdutores,
   saveCachedProdutos,
   saveCachedVitrine,
+  savePendingSales,
   syncOfflineSalesQueue,
 } from './lib/offlineSync.ts';
+import { readPendingSales } from './lib/backgroundQueue.ts';
 import {
   AppTab,
   CoordinatorUser,
@@ -175,10 +177,26 @@ export default function App() {
   }, [coordinator, activeTab, periodo, fetchRelatorio]);
 
   useEffect(() => {
-    if (isOnline && pendingSales.length > 0) {
+    if (isOnline) {
       handleSyncOfflineQueue();
     }
-  }, [isOnline, pendingSales.length, handleSyncOfflineQueue]);
+  }, [isOnline, handleSyncOfflineQueue]);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const handleWorkerMessage = (event: MessageEvent<{ type?: string; syncedCount?: number }>) => {
+      if (event.data?.type !== 'sales-synced') return;
+      void readPendingSales().then((remaining) => {
+        setPendingSales(remaining);
+        savePendingSales(remaining);
+      });
+      if ((event.data.syncedCount ?? 0) > 0) {
+        void Promise.all([fetchCoordinatorData(), fetchVitrine(), fetchRelatorio(periodo)]);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handleWorkerMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleWorkerMessage);
+  }, [fetchCoordinatorData, fetchVitrine, fetchRelatorio, periodo]);
 
   const handleSignIn = () => {
     setCoordinator({ uid: 'mvp-local', email: '', name: 'Coordenação', role: 'coordenacao' });
@@ -202,7 +220,7 @@ export default function App() {
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-    const queueOffline = () => {
+    const queueOffline = async () => {
       const offlineItem: OfflineSaleItem = {
         clientSaleId,
         produtoId: produto.id,
@@ -214,7 +232,7 @@ export default function App() {
         valorTotalCentavos: produto.precoUnitarioCentavos * quantidade,
         createdAtIso: new Date().toISOString(),
       };
-      const updatedQueue = enqueueOfflineSale(offlineItem);
+      const updatedQueue = await enqueueOfflineSale(offlineItem);
       setPendingSales(updatedQueue);
       return {
         ok: true,
