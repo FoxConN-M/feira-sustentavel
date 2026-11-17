@@ -1,10 +1,8 @@
-import os
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 
-import firebase_admin
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .models import Produto, Produtor, User, Venda
+from .models import Produto, Produtor, Venda
 from .schemas import ProdutoCreate, ProdutoUpdate, VendaCreate
 
 app = FastAPI(title="Feira Sustentável API", version="1.0.0")
@@ -48,51 +46,6 @@ def model_dict(record: Any, fields: list[str]) -> dict[str, Any]:
         if isinstance(value, datetime) and value.tzinfo is None:
             values[key] = value.replace(tzinfo=UTC)
     return camel(values)
-
-
-def verify_token(token: str) -> dict[str, Any]:
-    try:
-        try:
-            firebase_app = firebase_admin.get_app()
-        except ValueError:
-            credential_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-            project_id = os.getenv("FIREBASE_PROJECT_ID")
-            if credential_path:
-                firebase_app = firebase_admin.initialize_app(
-                    firebase_admin.credentials.Certificate(credential_path),
-                    {"projectId": project_id} if project_id else None,
-                )
-            else:
-                firebase_app = firebase_admin.initialize_app(
-                    options={"projectId": project_id} if project_id else None
-                )
-        from firebase_admin import auth
-
-        return auth.verify_id_token(token, app=firebase_app)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=401, detail="Sessão inválida ou expirada. Faça login novamente."
-        ) from exc
-
-
-def authenticated_user(
-    authorization: str | None = Header(default=None), db: Session = Depends(get_db)
-) -> dict[str, Any]:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Autenticação necessária para acessar este recurso.")
-    token_data = verify_token(authorization.removeprefix("Bearer ").strip())
-    uid = str(token_data.get("uid", ""))
-    if not uid:
-        raise HTTPException(status_code=401, detail="Sessão inválida ou expirada. Faça login novamente.")
-    email = token_data.get("email") or "coordenacao@feirasustentavel.org"
-    name = token_data.get("name") or "Coordenação"
-    user = db.scalar(select(User).where(User.uid == uid))
-    if user:
-        user.email, user.name = email, name
-    else:
-        db.add(User(uid=uid, email=email, name=name, role="coordenacao"))
-    db.commit()
-    return {"uid": uid, "email": email, "name": name, "role": "coordenacao"}
 
 
 def producer_product_row(product: Produto, producer: Produtor) -> dict[str, Any]:
@@ -178,13 +131,13 @@ def public_showcase(db: Session = Depends(get_db)) -> dict[str, list[dict[str, A
 
 
 @app.get("/api/me")
-def me(user: dict[str, Any] = Depends(authenticated_user)) -> dict[str, Any]:
-    return user
+def me() -> dict[str, str]:
+    return {"uid": "mvp-local", "email": "", "name": "Coordenação", "role": "coordenacao"}
 
 
 @app.get("/api/produtores")
 def list_producers(
-    _user: dict[str, Any] = Depends(authenticated_user), db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     rows = db.scalars(select(Produtor).where(Produtor.ativo.is_(True)).order_by(Produtor.id)).all()
     return {
@@ -196,7 +149,7 @@ def list_producers(
 
 @app.get("/api/produtos")
 def list_products(
-    _user: dict[str, Any] = Depends(authenticated_user), db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     rows = db.execute(
         select(Produto, Produtor)
@@ -209,7 +162,7 @@ def list_products(
 
 @app.post("/api/produtos", status_code=201)
 def create_product(
-    payload: ProdutoCreate, _user: dict[str, Any] = Depends(authenticated_user), db: Session = Depends(get_db)
+    payload: ProdutoCreate, db: Session = Depends(get_db)
 ) -> dict[str, Any]:
     producer = db.scalar(select(Produtor).where(Produtor.id == payload.produtor_id, Produtor.ativo.is_(True)))
     if not producer:
@@ -240,7 +193,6 @@ def create_product(
 def update_product(
     product_id: int,
     payload: ProdutoUpdate,
-    _user: dict[str, Any] = Depends(authenticated_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     values = payload.model_dump(exclude_unset=True)
@@ -276,7 +228,6 @@ def update_product(
 def register_sale(
     payload: VendaCreate,
     response: Response,
-    user: dict[str, Any] = Depends(authenticated_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     existing = db.scalar(select(Venda).where(Venda.client_sale_id == payload.client_sale_id))
@@ -311,7 +262,7 @@ def register_sale(
         quantidade=payload.quantidade,
         preco_unitario_centavos=product.preco_unitario_centavos,
         valor_total_centavos=product.preco_unitario_centavos * payload.quantidade,
-        registrado_por_uid=user["uid"],
+        registrado_por_uid="mvp-local",
         client_sale_id=payload.client_sale_id,
     )
     db.add(sale)
@@ -331,7 +282,7 @@ def register_sale(
 
 @app.get("/api/vendas")
 def recent_sales(
-    _user: dict[str, Any] = Depends(authenticated_user), db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     rows = db.execute(
         select(Venda, Produto, Produtor)
@@ -370,7 +321,6 @@ def recent_sales(
 @app.get("/api/relatorios/repasses")
 def report(
     periodo: str = Query(default="tudo", pattern="^(hoje|7dias|tudo)$"),
-    _user: dict[str, Any] = Depends(authenticated_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     now = datetime.now(UTC)

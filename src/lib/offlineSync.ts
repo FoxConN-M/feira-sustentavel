@@ -111,21 +111,14 @@ export function applyPendingDeductions(
   });
 }
 
-export async function syncOfflineSalesQueue(
-  getIdToken: () => Promise<string | null>
-): Promise<{ syncedCount: number; remaining: OfflineSaleItem[]; lastError: string | null }> {
+export async function syncOfflineSalesQueue(): Promise<{
+  syncedCount: number;
+  remaining: OfflineSaleItem[];
+  lastError: string | null;
+}> {
   const queue = loadPendingSales();
   if (queue.length === 0) {
     return { syncedCount: 0, remaining: [], lastError: null };
-  }
-
-  const token = await getIdToken();
-  if (!token) {
-    return {
-      syncedCount: 0,
-      remaining: queue,
-      lastError: 'Faça login na coordenação para sincronizar as vendas pendentes.',
-    };
   }
 
   const chronological = [...queue].reverse();
@@ -137,10 +130,7 @@ export async function syncOfflineSalesQueue(
     try {
       const response = await fetch('/api/vendas', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           produtoId: item.produtoId,
           quantidade: item.quantidade,

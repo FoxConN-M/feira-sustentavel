@@ -1,20 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  getRedirectResult,
-  onAuthStateChanged,
-  signInWithPopup,
-  signInWithRedirect,
-  signOut,
-  User,
-} from 'firebase/auth';
-import {
   FileBarChart2,
   LogOut,
   ShoppingBag,
   Sprout,
   Store,
 } from 'lucide-react';
-import { auth, googleAuthProvider } from './lib/firebase.ts';
 import { useOnlineStatus } from './hooks/useOnlineStatus.ts';
 import {
   applyPendingDeductions,
@@ -45,37 +36,11 @@ import { RegistroVenda } from './components/RegistroVenda.tsx';
 import { RelatoriosRepasses } from './components/RelatoriosRepasses.tsx';
 import { CoordinatorGate } from './components/CoordinatorGate.tsx';
 
-function describeAuthError(error: unknown): string {
-  const code = typeof error === 'object' && error && 'code' in error
-    ? String(error.code)
-    : '';
-  if (code === 'auth/unauthorized-domain') {
-    return 'Este domínio não está autorizado no Firebase Authentication. Adicione-o à lista de domínios autorizados do projeto.';
-  }
-  if (code === 'auth/operation-not-allowed') {
-    return 'O acesso com Google está desativado no Firebase Authentication. Ative o provedor Google no Console do Firebase.';
-  }
-  if (code === 'auth/popup-closed-by-user') {
-    return 'A janela de autenticação foi fechada antes da conclusão do login.';
-  }
-  if (code === 'auth/network-request-failed') {
-    return 'Não foi possível conectar ao Google. Verifique a conexão e tente novamente.';
-  }
-  return code
-    ? `Não foi possível concluir o login com Google (${code}).`
-    : 'Não foi possível concluir o login com Google. Tente novamente.';
-}
-
 export default function App() {
   const isOnline = useOnlineStatus();
   const [activeTab, setActiveTab] = useState<AppTab>('inicio');
 
-  // Firebase Auth state (token kept strictly in memory via User.getIdToken())
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [coordinator, setCoordinator] = useState<CoordinatorUser | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
 
   // Public Vitrine state
   const [vitrine, setVitrine] = useState<ProdutoVitrine[]>(() => loadCachedVitrine());
@@ -100,16 +65,6 @@ export default function App() {
   const [relatorioError, setRelatorioError] = useState<string | null>(null);
 
   const produtosComSaldoEfetivo = applyPendingDeductions(produtosServer, pendingSales);
-
-  const getToken = useCallback(async (): Promise<string | null> => {
-    const current = auth.currentUser;
-    if (!current) return null;
-    try {
-      return await current.getIdToken();
-    } catch {
-      return null;
-    }
-  }, []);
 
   const fetchVitrine = useCallback(async () => {
     setVitrineLoading(true);
@@ -136,27 +91,13 @@ export default function App() {
   }, []);
 
   const fetchCoordinatorData = useCallback(async () => {
-    const token = await getToken();
-    if (!token) return;
-
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      const [meRes, prodRes, itensRes, vendasRes] = await Promise.all([
-        fetch('/api/me', { headers }),
-        fetch('/api/produtores', { headers }),
-        fetch('/api/produtos', { headers }),
-        fetch('/api/vendas', { headers }),
+      const [prodRes, itensRes, vendasRes] = await Promise.all([
+        fetch('/api/produtores'),
+        fetch('/api/produtos'),
+        fetch('/api/vendas'),
       ]);
 
-      if (meRes.ok) {
-        const meData = await meRes.json();
-        setCoordinator(meData);
-      } else if (meRes.status === 401 || meRes.status === 403) {
-        const meData = await meRes.json().catch(() => ({}));
-        setCoordinator(null);
-        setAuthError(meData.error || 'Esta conta não tem acesso ao painel da coordenação.');
-        return;
-      }
       if (prodRes.ok) {
         const prodData = await prodRes.json();
         setProdutores(prodData.produtores || []);
@@ -174,21 +115,15 @@ export default function App() {
     } catch {
       // Offline fallback already populated from cache
     }
-  }, [getToken]);
+  }, []);
 
   const fetchRelatorio = useCallback(
     async (targetPeriodo: 'hoje' | '7dias' | 'tudo') => {
-      const token = await getToken();
-      if (!token) return;
-
       setRelatorioLoading(true);
       setRelatorioError(null);
       try {
         const response = await fetch(
-          `/api/relatorios/repasses?periodo=${encodeURIComponent(targetPeriodo)}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
+          `/api/relatorios/repasses?periodo=${encodeURIComponent(targetPeriodo)}`
         );
         if (!response.ok) {
           throw new Error('Falha ao carregar relatório.');
@@ -201,14 +136,14 @@ export default function App() {
         setRelatorioLoading(false);
       }
     },
-    [getToken]
+    []
   );
 
   const handleSyncOfflineQueue = useCallback(async () => {
     if (isSyncing || !isOnline) return;
     setIsSyncing(true);
     try {
-      const result = await syncOfflineSalesQueue(getToken);
+      const result = await syncOfflineSalesQueue();
       setPendingSales(result.remaining);
       if (result.syncedCount > 0) {
         await Promise.all([
@@ -223,7 +158,6 @@ export default function App() {
   }, [
     isSyncing,
     isOnline,
-    getToken,
     fetchCoordinatorData,
     fetchVitrine,
     fetchRelatorio,
@@ -235,68 +169,23 @@ export default function App() {
   }, [fetchVitrine]);
 
   useEffect(() => {
-    getRedirectResult(auth).catch((error: unknown) => {
-      setAuthError(describeAuthError(error));
-    });
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setFirebaseUser(user);
-      if (user) {
-        setCoordinator({
-          uid: user.uid,
-          email: user.email || '',
-          name: user.displayName || 'Coordenação',
-          role: 'coordenacao',
-        });
-        await fetchCoordinatorData();
-      } else {
-        setCoordinator(null);
-      }
-      setAuthReady(true);
-    });
-    return () => unsubscribe();
-  }, [fetchCoordinatorData]);
-
-  useEffect(() => {
-    if (firebaseUser && activeTab === 'repasses') {
+    if (coordinator && activeTab === 'repasses') {
       fetchRelatorio(periodo);
     }
-  }, [firebaseUser, activeTab, periodo, fetchRelatorio]);
+  }, [coordinator, activeTab, periodo, fetchRelatorio]);
 
   useEffect(() => {
-    if (isOnline && firebaseUser && pendingSales.length > 0) {
+    if (isOnline && pendingSales.length > 0) {
       handleSyncOfflineQueue();
     }
-  }, [isOnline, firebaseUser, pendingSales.length, handleSyncOfflineQueue]);
+  }, [isOnline, pendingSales.length, handleSyncOfflineQueue]);
 
-  const handleSignIn = async () => {
-    setAuthLoading(true);
-    setAuthError(null);
-    try {
-      await signInWithPopup(auth, googleAuthProvider);
-    } catch (error) {
-      const code = typeof error === 'object' && error && 'code' in error
-        ? String(error.code)
-        : '';
-      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
-        try {
-          await signInWithRedirect(auth, googleAuthProvider);
-          return;
-        } catch (redirectError) {
-          setAuthError(describeAuthError(redirectError));
-        }
-      } else {
-        setAuthError(describeAuthError(error));
-      }
-    } finally {
-      setAuthLoading(false);
-    }
+  const handleSignIn = () => {
+    setCoordinator({ uid: 'mvp-local', email: '', name: 'Coordenação', role: 'coordenacao' });
+    void fetchCoordinatorData();
   };
 
-  const handleSignOut = async () => {
-    await signOut(auth);
+  const handleSignOut = () => {
     setCoordinator(null);
     setActiveTab('inicio');
   };
@@ -338,22 +227,10 @@ export default function App() {
       return queueOffline();
     }
 
-    const token = await getToken();
-    if (!token) {
-      return {
-        ok: false,
-        offlineQueued: false,
-        message: 'Sessão expirada. Faça login novamente.',
-      };
-    }
-
     try {
       const response = await fetch('/api/vendas', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           produtoId: produto.id,
           quantidade,
@@ -391,17 +268,11 @@ export default function App() {
     precoUnitarioCentavos: number;
     estoqueSaldo: number;
   }) => {
-    const token = await getToken();
-    if (!token) {
-      return { ok: false, message: 'Autenticação necessária.' };
-    }
-
     try {
       const response = await fetch('/api/produtos', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(input),
       });
@@ -422,17 +293,11 @@ export default function App() {
   };
 
   const handleAdjustStock = async (produtoId: number, novoSaldo: number) => {
-    const token = await getToken();
-    if (!token) {
-      return { ok: false, message: 'Autenticação necessária.' };
-    }
-
     try {
       const response = await fetch(`/api/produtos/${produtoId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ estoqueSaldo: novoSaldo }),
       });
@@ -515,8 +380,7 @@ export default function App() {
           <div className="flex items-center gap-2.5 shrink-0">
             <PWAInstallButton />
 
-            {authReady &&
-              (coordinator ? (
+            {coordinator ? (
                 <button
                   type="button"
                   onClick={handleSignOut}
@@ -528,13 +392,12 @@ export default function App() {
               ) : (
                 <button
                   type="button"
-                  disabled={authLoading}
                   onClick={handleSignIn}
                   className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-[#166534] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#14532D] disabled:opacity-60 whitespace-nowrap shrink-0"
                 >
-                  {authLoading ? 'Entrando...' : 'Entrar'}
+                  Entrar
                 </button>
-              ))}
+              )}
           </div>
         </div>
       </header>
@@ -553,9 +416,7 @@ export default function App() {
             loading={vitrineLoading}
             error={vitrineError}
             coordinator={coordinator}
-            authLoading={authLoading}
-            authError={authError}
-            onSignIn={handleSignIn}
+            onEnterPanel={handleSignIn}
             onNavigate={setActiveTab}
             onRetry={fetchVitrine}
           />
@@ -575,9 +436,7 @@ export default function App() {
             <CoordinatorGate
               title="Registrar Venda"
               description="O registro de vendas com baixa automática no estoque é exclusivo para a coordenação da Feira Sustentável."
-              authLoading={authLoading}
-              authError={authError}
-              onSignIn={handleSignIn}
+              onEnterPanel={handleSignIn}
               onGoToVitrine={() => setActiveTab('inicio')}
             />
           ))}
@@ -597,9 +456,7 @@ export default function App() {
             <CoordinatorGate
               title="Relatório de Repasses por Produtor"
               description="Os consolidados financeiros e exportações por família produtora são restritos à coordenação."
-              authLoading={authLoading}
-              authError={authError}
-              onSignIn={handleSignIn}
+              onEnterPanel={handleSignIn}
               onGoToVitrine={() => setActiveTab('inicio')}
             />
           ))}

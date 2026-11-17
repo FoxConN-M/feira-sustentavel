@@ -16,9 +16,7 @@ interface VitrinePublicaProps {
   loading: boolean;
   error: string | null;
   coordinator: CoordinatorUser | null;
-  authLoading: boolean;
-  authError: string | null;
-  onSignIn: () => void;
+  onEnterPanel: () => void;
   onNavigate: (tab: AppTab) => void;
   onRetry: () => void;
 }
@@ -28,9 +26,7 @@ export const VitrinePublica: React.FC<VitrinePublicaProps> = ({
   loading,
   error,
   coordinator,
-  authLoading,
-  authError,
-  onSignIn,
+  onEnterPanel,
   onNavigate,
   onRetry,
 }) => {
@@ -110,7 +106,7 @@ export const VitrinePublica: React.FC<VitrinePublicaProps> = ({
                 <h2 className="mt-2 text-xl font-bold text-[#14261C]">
                   Olá, {coordinator.name}
                 </h2>
-                <p className="mt-1 text-sm text-[#3D4F44]">{coordinator.email}</p>
+                {coordinator.email && <p className="mt-1 text-sm text-[#3D4F44]">{coordinator.email}</p>}
                 <p className="mt-3 text-sm text-[#3D4F44]">
                   Acesse o ponto de venda rápido, cadastre novos lotes ou gere o relatório
                   de repasses financeiros para as famílias.
@@ -146,32 +142,19 @@ export const VitrinePublica: React.FC<VitrinePublicaProps> = ({
                   Painel Operacional da Feira
                 </h2>
                 <p className="mt-2 text-sm text-[#3D4F44]">
-                  Entre com a conta Google autorizada da coordenação para registrar vendas
-                  com baixa automática no estoque, gerenciar produtos e emitir repasses.
+                  Acesse o painel operacional para registrar vendas com baixa automática
+                  no estoque e consultar os repasses das famílias.
                 </p>
               </div>
 
               <div className="mt-6 space-y-3">
-                {authError && (
-                  <div
-                    role="alert"
-                    className="flex items-start gap-2 rounded-xl border border-[#F5C2C0] bg-[#FEF2F2] p-3 text-xs font-medium text-[#991B1B]"
-                  >
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span>{authError}</span>
-                  </div>
-                )}
-
                 <button
                   type="button"
-                  disabled={authLoading}
-                  onClick={onSignIn}
+                  onClick={onEnterPanel}
                   className="inline-flex min-h-[48px] w-full items-center justify-center gap-2.5 rounded-xl bg-[#166534] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#14532D] disabled:opacity-60"
                 >
                   <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span>
-                    {authLoading ? 'Autenticando...' : 'Entrar como Coordenação'}
-                  </span>
+                  <span>Entrar como Coordenação</span>
                 </button>
               </div>
             </>
