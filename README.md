@@ -111,11 +111,19 @@ O backend mantém os nomes das tabelas existentes para facilitar compatibilidade
 
 A baixa de estoque é executada por uma atualização condicional (`estoque_saldo >= quantidade`) no banco. Isso impede que duas vendas simultâneas usem o mesmo saldo além do disponível.
 
+## Catálogo de demonstração
+
+O conjunto contém 15 famílias fictícias, cada uma com três produtos agrícolas, totalizando 45 itens. Os nomes das famílias e localidade incluem a indicação de teste para não confundir os dados de exemplo com pessoas produtoras reais.
+
+Os itens cobrem verduras, folhas, raízes, legumes e grãos vendidos com frequência em feiras, incluindo alface, couve, coentro, rúcula, tomate, cenoura, beterraba, quiabo, maxixe, abóbora, mandioca, batata-doce, inhame, feijão verde, milho verde, cebola, alho, repolho, brócolis, vagem e amendoim verde. Os registros incluem preços unitários em centavos e saldos iniciais variados para experimentar seleção, subtotal, validação de estoque, venda e relatórios.
+
+Para popular ou completar o catálogo em um banco já inicializado, execute `python -m backend.seed_demo_data`. O script não apaga dados e não sobrescreve os produtos existentes.
+
 ## Requisitos
 
 - Node.js 20.19+ ou 22.12+.
 - Python 3.11+.
-- PostgreSQL.
+- PostgreSQL para implantação. Em desenvolvimento, SQLite é usado por padrão se `DATABASE_URL` não for definida.
 
 ## Configuração local
 
@@ -128,8 +136,10 @@ A baixa de estoque é executada por uma atualização condicional (`estoque_sald
    python -m pip install -r requirements.txt
    ```
 
-3. Copie `.env.example` para `.env` e ajuste `DATABASE_URL` para apontar ao PostgreSQL local.
-4. Para um banco novo, crie as tabelas ausentes:
+3. Para usar SQLite local, deixe `DATABASE_URL` como `sqlite:///./feira_sustentavel.db` no `.env.example`. Para usar PostgreSQL, troque a variável pela URL do seu banco.
+4. Ao iniciar em modo desenvolvimento, FastAPI cria as tabelas ausentes e popula automaticamente o catálogo de demonstração. O arquivo SQLite fica na raiz do projeto e é ignorado pelo Git.
+
+   Se estiver preparando um banco fora do modo de desenvolvimento, crie as tabelas ausentes manualmente:
 
    ```powershell
    python -m backend.init_db
@@ -137,7 +147,15 @@ A baixa de estoque é executada por uma atualização condicional (`estoque_sald
 
    `create_all` cria tabelas que ainda não existem; não é uma ferramenta de migração para alterar estruturas existentes.
 
-5. Inicie a aplicação em desenvolvimento:
+5. Para popular ou completar manualmente o catálogo em qualquer banco:
+
+   ```powershell
+   python -m backend.seed_demo_data
+   ```
+
+   O comando pode ser executado novamente sem duplicar famílias e produtos existentes. Em desenvolvimento esse passo já ocorre automaticamente na inicialização.
+
+6. Inicie a aplicação em desenvolvimento:
 
    ```powershell
    npm run dev
@@ -145,7 +163,7 @@ A baixa de estoque é executada por uma atualização condicional (`estoque_sald
 
    O frontend fica em `http://localhost:3000`. O Vite encaminha `/api` para FastAPI em `http://localhost:8000`.
 
-O script de desenvolvimento usa automaticamente `.venv/Scripts/python.exe` no Windows ou `.venv/bin/python` em Linux/macOS. Também é possível definir `PYTHON` para indicar outro interpretador.
+O script de desenvolvimento usa automaticamente `.venv/Scripts/python.exe` no Windows ou `.venv/bin/python` em Linux/macOS. Também é possível definir `PYTHON` para indicar outro interpretador. `npm start` também usa o modo de demonstração por padrão; para operar com PostgreSQL sem semear automaticamente, defina `APP_ENV=production` e configure `DATABASE_URL`.
 
 ## Comandos
 
@@ -157,7 +175,7 @@ O script de desenvolvimento usa automaticamente `.venv/Scripts/python.exe` no Wi
 | `npm run lint` | Executa TypeScript e Ruff. |
 | `npm test` | Executa os testes da API com SQLite temporário. |
 | `npm run build` | Gera frontend de produção e arquivos do Service Worker. |
-| `npm start` | Inicia FastAPI; serve `dist` quando o build existe. |
+| `npm start` | Inicia FastAPI no modo de demonstração; serve `dist` quando o build existe. |
 | `npm run preview` | Serve a saída de build pelo preview do Vite. |
 
 ## Offline e instalação

@@ -1,3 +1,5 @@
+import os
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
@@ -10,11 +12,27 @@ from sqlalchemy import desc, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .database import get_db
+from .database import Base, SessionLocal, engine, get_db
 from .models import Produto, Produtor, Venda
 from .schemas import ProdutoCreate, ProdutoUpdate, VendaCreate
 
-app = FastAPI(title="Feira Sustentável API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    if os.getenv("APP_ENV", "development").lower() == "development":
+        Base.metadata.create_all(bind=engine)
+        from .seed_demo_data import seed_demo_data
+
+        with SessionLocal() as session:
+            result = seed_demo_data(session)
+        print(
+            f"Catálogo de teste pronto: {result['familiasCriadas']} famílias e "
+            f"{result['produtosCriados']} produtos novos."
+        )
+    yield
+
+
+app = FastAPI(title="Feira Sustentável API", version="1.0.0", lifespan=lifespan)
 
 
 @app.middleware("http")

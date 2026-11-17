@@ -9,7 +9,7 @@ const python = process.env.PYTHON || (existsSync(localPython) ? localPython : 'p
 const child = spawn(
   python,
   ['-m', 'uvicorn', 'backend.main:app', '--host', '0.0.0.0', '--port', '8000'],
-  { stdio: 'inherit', env: process.env },
+  { stdio: 'inherit', env: { ...process.env, APP_ENV: process.env.APP_ENV || 'development' } },
 );
 child.on('error', (error) => {
   console.error(error.message);

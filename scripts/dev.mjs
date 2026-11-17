@@ -11,7 +11,8 @@ const commands = [
   { command: python, args: ['-m', 'uvicorn', 'backend.main:app', '--reload', '--host', '0.0.0.0', '--port', '8000'] },
 ];
 
-const children = commands.map(({ command, args }) => spawn(command, args, { stdio: 'inherit', env: process.env }));
+const devEnv = { ...process.env, APP_ENV: process.env.APP_ENV || 'development' };
+const children = commands.map(({ command, args }) => spawn(command, args, { stdio: 'inherit', env: devEnv }));
 let stopping = false;
 const stop = (code = 0) => {
   if (stopping) return;
