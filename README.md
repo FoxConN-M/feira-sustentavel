@@ -19,11 +19,11 @@ PWA mobile-first para consulta pública da feira, registro de vendas com baixa d
 
 1. Instale as dependências web: `npm install`.
 2. Crie e ative um ambiente virtual Python e instale `pip install -r requirements.txt`.
-3. Copie `.env.example` para `.env`, configure `DATABASE_URL`, `FIREBASE_PROJECT_ID` e `COORDINATOR_EMAILS` (lista separada por vírgula). Para autenticação local, configure credenciais Firebase Admin via `GOOGLE_APPLICATION_CREDENTIALS` ou ADC.
+3. Copie `.env.example` para `.env` e configure `DATABASE_URL` e `FIREBASE_PROJECT_ID`. Para autenticação local, configure credenciais Firebase Admin via `GOOGLE_APPLICATION_CREDENTIALS` ou ADC.
 4. Para um banco novo, crie as tabelas compatíveis com o esquema atual com `python -m backend.init_db`. O comando usa `create_all` e não altera tabelas existentes.
 5. Inicie frontend e API juntos com `npm run dev`. O frontend fica em `http://localhost:3000` e encaminha `/api` para FastAPI em `http://localhost:8000`.
 
-Para produção, gere o frontend com `npm run build` e inicie a API com `npm start`; FastAPI serve os arquivos de `dist` quando a pasta existe.
+O login Google é validado pelo Firebase, mas o e-mail não é usado como bloqueio de acesso. O painel e seus controles mantêm o estado visual da coordenação para o MVP. Para produção, gere o frontend com `npm run build` e inicie a API com `npm start`; FastAPI serve os arquivos de `dist` quando a pasta existe.
 
 ## Verificações
 

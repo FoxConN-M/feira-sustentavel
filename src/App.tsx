@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
+import {
+  getRedirectResult,
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+  User,
+} from 'firebase/auth';
 import {
   FileBarChart2,
   LogOut,
@@ -37,6 +44,27 @@ import { VitrinePublica } from './components/VitrinePublica.tsx';
 import { RegistroVenda } from './components/RegistroVenda.tsx';
 import { RelatoriosRepasses } from './components/RelatoriosRepasses.tsx';
 import { CoordinatorGate } from './components/CoordinatorGate.tsx';
+
+function describeAuthError(error: unknown): string {
+  const code = typeof error === 'object' && error && 'code' in error
+    ? String(error.code)
+    : '';
+  if (code === 'auth/unauthorized-domain') {
+    return 'Este domínio não está autorizado no Firebase Authentication. Adicione-o à lista de domínios autorizados do projeto.';
+  }
+  if (code === 'auth/operation-not-allowed') {
+    return 'O acesso com Google está desativado no Firebase Authentication. Ative o provedor Google no Console do Firebase.';
+  }
+  if (code === 'auth/popup-closed-by-user') {
+    return 'A janela de autenticação foi fechada antes da conclusão do login.';
+  }
+  if (code === 'auth/network-request-failed') {
+    return 'Não foi possível conectar ao Google. Verifique a conexão e tente novamente.';
+  }
+  return code
+    ? `Não foi possível concluir o login com Google (${code}).`
+    : 'Não foi possível concluir o login com Google. Tente novamente.';
+}
 
 export default function App() {
   const isOnline = useOnlineStatus();
@@ -207,6 +235,12 @@ export default function App() {
   }, [fetchVitrine]);
 
   useEffect(() => {
+    getRedirectResult(auth).catch((error: unknown) => {
+      setAuthError(describeAuthError(error));
+    });
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
       if (user) {
@@ -242,10 +276,20 @@ export default function App() {
     setAuthError(null);
     try {
       await signInWithPopup(auth, googleAuthProvider);
-    } catch {
-      setAuthError(
-        'Não foi possível concluir o login com Google. Verifique se os pop-ups estão permitidos.'
-      );
+    } catch (error) {
+      const code = typeof error === 'object' && error && 'code' in error
+        ? String(error.code)
+        : '';
+      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+        try {
+          await signInWithRedirect(auth, googleAuthProvider);
+          return;
+        } catch (redirectError) {
+          setAuthError(describeAuthError(redirectError));
+        }
+      } else {
+        setAuthError(describeAuthError(error));
+      }
     } finally {
       setAuthLoading(false);
     }

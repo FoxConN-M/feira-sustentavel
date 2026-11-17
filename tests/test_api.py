@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from backend import main as backend_main
 from backend.database import Base, get_db
 from backend.main import app, authenticated_user
 from backend.models import Produto, Produtor
@@ -116,3 +117,24 @@ async def test_protected_routes_require_bearer_token(client: AsyncClient) -> Non
     response = await client.get("/api/produtores")
     assert response.status_code == 401
     assert "error" in response.json()
+
+
+async def test_authenticated_account_is_not_blocked_by_email_or_provider(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("COORDINATOR_EMAILS", "someone-else@example.org")
+    monkeypatch.setattr(
+        backend_main,
+        "verify_token",
+        lambda _token: {
+            "uid": "authenticated-user",
+            "email": "coord@example.org",
+            "email_verified": False,
+            "name": "Coordenação",
+            "firebase": {"sign_in_provider": "password"},
+        },
+    )
+    app.dependency_overrides.pop(authenticated_user)
+    response = await client.get("/api/me", headers={"Authorization": "Bearer valid-token"})
+    assert response.status_code == 200
+    assert response.json()["email"] == "coord@example.org"

@@ -85,13 +85,6 @@ def authenticated_user(
     if not uid:
         raise HTTPException(status_code=401, detail="Sessão inválida ou expirada. Faça login novamente.")
     email = token_data.get("email") or "coordenacao@feirasustentavel.org"
-    allowlist = {
-        configured.strip().lower()
-        for configured in os.getenv("COORDINATOR_EMAILS", "").split(",")
-        if configured.strip()
-    }
-    if email.lower() not in allowlist:
-        raise HTTPException(status_code=403, detail="Esta conta não tem acesso ao painel da coordenação.")
     name = token_data.get("name") or "Coordenação"
     user = db.scalar(select(User).where(User.uid == uid))
     if user:
