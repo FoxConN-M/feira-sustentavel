@@ -1,4 +1,5 @@
 import type { OfflineSaleItem } from '../types.ts';
+import { apiUrl } from './api.ts';
 
 const DATABASE_NAME = 'feira-sustentavel-offline';
 const STORE_NAME = 'pending-sales';
@@ -75,8 +76,7 @@ export async function transmitPendingSales(): Promise<number> {
   const sales = await readPendingSales();
   let syncedCount = 0;
   for (const sale of sales) {
-    const endpoint = new URL('/api/vendas', globalThis.location.origin);
-    const response = await fetch(endpoint, {
+    const response = await fetch(apiUrl('/api/vendas'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

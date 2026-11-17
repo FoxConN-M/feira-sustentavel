@@ -21,6 +21,17 @@ import {
   syncOfflineSalesQueue,
 } from './lib/offlineSync.ts';
 import { readPendingSales } from './lib/backgroundQueue.ts';
+import { apiUrl, isStaticDemoMode } from './lib/api.ts';
+import {
+  adjustDemoStock,
+  createDemoProduct,
+  createDemoReport,
+  demoShowcase,
+  loadDemoProducts,
+  loadDemoProducers,
+  loadDemoSales,
+  recordDemoSale,
+} from './lib/demoMode.ts';
 import {
   AppTab,
   CoordinatorUser,
@@ -71,8 +82,15 @@ export default function App() {
   const fetchVitrine = useCallback(async () => {
     setVitrineLoading(true);
     setVitrineError(null);
+    if (isStaticDemoMode) {
+      const items = demoShowcase();
+      setVitrine(items);
+      saveCachedVitrine(items);
+      setVitrineLoading(false);
+      return;
+    }
     try {
-      const response = await fetch('/api/vitrine');
+      const response = await fetch(apiUrl('/api/vitrine'));
       if (!response.ok) {
         throw new Error('Falha ao carregar vitrine.');
       }
@@ -93,11 +111,22 @@ export default function App() {
   }, []);
 
   const fetchCoordinatorData = useCallback(async () => {
+    if (isStaticDemoMode) {
+      const producerItems = loadDemoProducers();
+      const productItems = loadDemoProducts();
+      const salesItems = loadDemoSales();
+      setProdutores(producerItems);
+      setProdutosServer(productItems);
+      setVendasRecentes(salesItems);
+      saveCachedProdutores(producerItems);
+      saveCachedProdutos(productItems);
+      return;
+    }
     try {
       const [prodRes, itensRes, vendasRes] = await Promise.all([
-        fetch('/api/produtores'),
-        fetch('/api/produtos'),
-        fetch('/api/vendas'),
+        fetch(apiUrl('/api/produtores')),
+        fetch(apiUrl('/api/produtos')),
+        fetch(apiUrl('/api/vendas')),
       ]);
 
       if (prodRes.ok) {
@@ -123,9 +152,14 @@ export default function App() {
     async (targetPeriodo: 'hoje' | '7dias' | 'tudo') => {
       setRelatorioLoading(true);
       setRelatorioError(null);
+      if (isStaticDemoMode) {
+        setRelatorio(createDemoReport(targetPeriodo));
+        setRelatorioLoading(false);
+        return;
+      }
       try {
         const response = await fetch(
-          `/api/relatorios/repasses?periodo=${encodeURIComponent(targetPeriodo)}`
+          apiUrl(`/api/relatorios/repasses?periodo=${encodeURIComponent(targetPeriodo)}`)
         );
         if (!response.ok) {
           throw new Error('Falha ao carregar relatório.');
@@ -143,6 +177,11 @@ export default function App() {
 
   const handleSyncOfflineQueue = useCallback(async () => {
     if (isSyncing || !isOnline) return;
+    if (isStaticDemoMode) {
+      setPendingSales([]);
+      savePendingSales([]);
+      return;
+    }
     setIsSyncing(true);
     try {
       const result = await syncOfflineSalesQueue();
@@ -220,6 +259,19 @@ export default function App() {
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
+    if (isStaticDemoMode) {
+      const result = recordDemoSale({ produtoId: produto.id, quantidade, clientSaleId });
+      if (!result) {
+        return { ok: false, offlineQueued: false, message: 'Estoque insuficiente para esta venda.' };
+      }
+      await Promise.all([fetchCoordinatorData(), fetchVitrine()]);
+      return {
+        ok: true,
+        offlineQueued: false,
+        message: `Venda salva nesta demonstração local: ${quantidade} ${produto.unidade} de ${produto.nome}.`,
+      };
+    }
+
     const queueOffline = async () => {
       const offlineItem: OfflineSaleItem = {
         clientSaleId,
@@ -246,7 +298,7 @@ export default function App() {
     }
 
     try {
-      const response = await fetch('/api/vendas', {
+      const response = await fetch(apiUrl('/api/vendas'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -286,8 +338,13 @@ export default function App() {
     precoUnitarioCentavos: number;
     estoqueSaldo: number;
   }) => {
+    if (isStaticDemoMode) {
+      createDemoProduct(input);
+      await Promise.all([fetchCoordinatorData(), fetchVitrine()]);
+      return { ok: true, message: `Produto "${input.nome}" salvo nesta demonstração local.` };
+    }
     try {
-      const response = await fetch('/api/produtos', {
+      const response = await fetch(apiUrl('/api/produtos'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -311,8 +368,15 @@ export default function App() {
   };
 
   const handleAdjustStock = async (produtoId: number, novoSaldo: number) => {
+    if (isStaticDemoMode) {
+      if (!adjustDemoStock(produtoId, novoSaldo)) {
+        return { ok: false, message: 'Não foi possível atualizar o estoque.' };
+      }
+      await Promise.all([fetchCoordinatorData(), fetchVitrine()]);
+      return { ok: true, message: 'Estoque atualizado nesta demonstração local.' };
+    }
     try {
-      const response = await fetch(`/api/produtos/${produtoId}`, {
+      const response = await fetch(apiUrl(`/api/produtos/${produtoId}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -426,6 +490,16 @@ export default function App() {
         isSyncing={isSyncing}
         onSyncNow={handleSyncOfflineQueue}
       />
+
+      {isStaticDemoMode && (
+        <aside className="mx-auto mt-4 max-w-7xl px-4 sm:px-6" role="status">
+          <p className="rounded-xl border border-[#F3D9B1] bg-[#FEF7EC] px-4 py-3 text-sm text-[#713F12]">
+            Demonstração GitHub Pages: vendas e alterações ficam somente neste navegador. Configure
+            <code className="mx-1 rounded bg-white/70 px-1">VITE_API_BASE_URL</code>
+            para conectar uma API FastAPI hospedada separadamente.
+          </p>
+        </aside>
+      )}
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {activeTab === 'inicio' && (

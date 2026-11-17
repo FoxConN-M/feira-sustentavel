@@ -10,6 +10,7 @@ import {
   registerSalesBackgroundSync,
   transmitPendingSales,
 } from './backgroundQueue.ts';
+import { apiUrl } from './api.ts';
 
 const OFFLINE_SALES_KEY = 'feira_sustentavel_pending_sales_v1';
 const CACHE_VITRINE_KEY = 'feira_sustentavel_cache_vitrine_v1';
@@ -151,7 +152,7 @@ export async function syncOfflineSalesQueue(): Promise<{
     const remainingLegacy: OfflineSaleItem[] = [];
     for (const item of [...legacyQueue].reverse()) {
       try {
-        const response = await fetch('/api/vendas', {
+        const response = await fetch(apiUrl('/api/vendas'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
