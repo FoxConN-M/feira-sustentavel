@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import desc, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .database import Base, SessionLocal, engine, get_db
@@ -139,7 +139,11 @@ def sale_result(sale: Venda, product: Produto, synced: bool) -> dict[str, Any]:
 
 
 @app.get("/api/health")
-def health() -> dict[str, bool]:
+def health(db: Session = Depends(get_db)) -> dict[str, bool]:
+    try:
+        db.execute(select(1))
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Banco de dados indisponível.") from exc
     return {"ok": True}
 
 

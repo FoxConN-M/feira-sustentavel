@@ -554,6 +554,15 @@ export default function App() {
           ))}
       </main>
 
+      <footer className="mx-auto max-w-7xl px-4 pb-24 text-center text-sm text-[#4A5D52] sm:px-6 md:pb-8">
+        <a
+          href={`${import.meta.env.BASE_URL}status/`}
+          className="inline-flex min-h-[48px] items-center font-semibold text-[#166534] underline-offset-4 hover:underline"
+        >
+          Status e disponibilidade da plataforma
+        </a>
+      </footer>
+
       {/* Mobile Fixed Bottom Thumb-Zone Tab Bar (h-16; total sticky height 120px <= 15% on mobile) */}
       <nav
         aria-label="Menu rápido inferior"

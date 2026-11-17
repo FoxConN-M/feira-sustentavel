@@ -79,7 +79,7 @@ Todas as rotas listadas abaixo estão abertas no modo atual do MVP. Valores mone
 
 | Método | Rota | Uso |
 |---|---|---|
-| `GET` | `/api/health` | Verifica se a API está respondendo. |
+| `GET` | `/api/health` | Verifica a API e a conectividade com o banco de dados. |
 | `GET` | `/api/vitrine` | Lista pública de produtos ativos e suas famílias. |
 | `GET` | `/api/me` | Retorna a identidade visual fixa `mvp-local`; não representa login validado. |
 | `GET` | `/api/produtores` | Lista produtores ativos. |
@@ -220,3 +220,9 @@ Para ativar a publicação:
 O GitHub Pages serve conteúdo estático e não hospeda a API FastAPI. Sem configuração adicional, a versão publicada entra no **modo demonstração local**: disponibiliza as 15 famílias e 45 produtos de exemplo, e grava vendas, mudanças de estoque e relatórios no armazenamento do navegador usado. Esses dados não são enviados ao servidor nem compartilhados entre dispositivos.
 
 Para usar dados compartilhados e persistentes, hospede a API FastAPI e PostgreSQL em um serviço separado. Depois, crie a variável de repositório `VITE_API_BASE_URL` com a origem HTTPS da API (por exemplo, `https://api.exemplo.org`, sem `/api` no final). Configure também `CORS_ORIGINS` no backend com a origem exata do GitHub Pages, como `https://usuario.github.io`. O workflow lê `VITE_API_BASE_URL` durante o build e publica uma versão conectada à API. Não coloque segredos de backend em variáveis `VITE_*`, pois elas ficam públicas no JavaScript compilado.
+
+## Status Page e disponibilidade
+
+A página pública fica em `/status/` dentro do site. O workflow `.github/workflows/monitor-status.yml` verifica o PWA e, se houver URL configurada, a API a cada cinco minutos. A API só é marcada como saudável quando `/api/health` responde HTTP 200 e consegue consultar o banco. A página consulta as execuções públicas do monitor no GitHub Actions, atualiza a cada cinco minutos, calcula o uptime das últimas 100 verificações concluídas e agrupa falhas consecutivas como incidentes, incluindo o horário de recuperação.
+
+Para monitorar a API, configure nas variáveis do repositório `STATUS_API_HEALTH_URL` com o endereço completo do health check (por exemplo, `https://api.exemplo.org/api/health`). Se `VITE_API_BASE_URL` já estiver configurada, o monitor deriva o endereço `/api/health` automaticamente. Sem uma API publicada, a página exibe a API como **Não configurado** e acompanha a disponibilidade do PWA. Para que o histórico seja consultado publicamente sem credenciais, o repositório precisa permitir leitura pública das execuções do Actions.
