@@ -1,0 +1,1 @@
+"""Feira Sustentável FastAPI backend."""

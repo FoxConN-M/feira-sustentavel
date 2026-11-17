@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Feira Sustentável - Painel Administrativo (Protótipo PWA)</title>
+  <meta name="theme-color" content="#14532D" />
+  <!-- Tailwind CSS via CDN para estilização utilitária mobile-first -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              dark: '#14532D',   /* Contraste > 8.5:1 com branco */
+              hover: '#0F3F22',
+              light: '#ECFDF5',
+              ink: '#111827',    /* Contraste > 14:1 em fundo claro */
+              muted: '#374151',  /* Contraste > 9.5:1 em fundo branco */
+              surface: '#F4F6F4'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Indicadores de foco altamente evidentes para acessibilidade por teclado e toque (WCAG 2.1 AA) */
+    *:focus-visible {
+      outline: 3px solid #14532D;
+      outline-offset: 2px;
+    }
+
+    /* Alinhamento tabular para valores monetários e quantidades */
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Respeito à preferência de redução de movimento */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#F4F6F4] text-[#111827] antialiased selection:bg-[#14532D] selection:text-white">
+
+  <!-- Link de salto para leitores de tela e navegação por teclado -->
+  <a
+    href="#conteudo-principal"
+    class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:flex focus:min-h-[48px] focus:items-center focus:rounded-xl focus:bg-[#14532D] focus:px-4 focus:font-semibold focus:text-white"
+  >
+    Pular para o conteúdo principal
+  </a>
+
+  <!-- Cabeçalho Global com Contraste Otimizado para Uso Sob Luz Solar -->
+  <header class="sticky top-0 z-30 border-b border-[#D1D5DB] bg-white">
+    <div class="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- Logotipo SVG da Associação -->
+        <div
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#14532D] text-white"
+          aria-hidden="true"
+        >
+          <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18" />
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <p class="truncate text-base font-bold text-[#111827] sm:text-lg">
+            Feira Sustentável
+          </p>
+          <p class="truncate text-xs font-medium text-[#374151]">
+            Associação de Produtores e Artesãos
+          </p>
+        </div>
+      </div>
+
+      <!-- Indicador Global de Status de Sincronização (Ícone + Texto, WCAG 2.1 AA) -->
+      <div
+        id="sync-status-badge"
+        role="status"
+        aria-live="polite"
+        class="inline-flex min-h-[48px] items-center gap-2 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-3 py-2 text-xs font-bold text-[#14532D] shrink-0"
+      >
+        <svg class="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+        </svg>
+        <span id="sync-status-text">Online (Service Worker Ativo)</span>
+      </div>
+    </div>
+
+    <!-- Navegação Interna entre as 3 Telas (Alvos táteis >= 48px) -->
+    <nav aria-label="Navegação das telas do protótipo" class="border-t border-[#E5E7EB] bg-[#F9FAFB]">
+      <div class="mx-auto grid max-w-4xl grid-cols-3 gap-1 px-2 py-1.5 sm:px-6">
+        <button
+          type="button"
+          id="nav-tela-1"
+          data-screen="tela-1"
+          class="nav-tab min-h-[48px] rounded-lg px-2 py-2 text-xs font-bold transition-colors sm:text-sm bg-[#14532D] text-white"
+        >
+          1. Acesso
+        </button>
+        <button
+          type="button"
+          id="nav-tela-2"
+          data-screen="tela-2"
+          class="nav-tab min-h-[48px] rounded-lg px-2 py-2 text-xs font-bold transition-colors sm:text-sm text-[#111827] hover:bg-[#E5E7EB]"
+        >
+          2. Registrar Venda
+        </button>
+        <button
+          type="button"
+          id="nav-tela-3"
+          data-screen="tela-3"
+          class="nav-tab min-h-[48px] rounded-lg px-2 py-2 text-xs font-bold transition-colors sm:text-sm text-[#111827] hover:bg-[#E5E7EB]"
+        >
+          3. Repasses
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Área Principal do Aplicativo -->
+  <main id="conteudo-principal" class="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+
+    <!-- ===================================================================== -->
+    <!-- TELA 1: ENTRADA PRINCIPAL E MENU INICIAL (AUTENTICAÇÃO)               -->
+    <!-- ===================================================================== -->
+    <section
+      id="tela-1"
+      aria-labelledby="titulo-tela-1"
+      class="mx-auto max-w-xl rounded-2xl border border-[#D1D5DB] bg-white p-6 shadow-sm sm:p-8"
+    >
+      <div class="border-b border-[#E5E7EB] pb-5">
+        <p class="text-xs font-bold uppercase tracking-wider text-[#14532D]">
+          Tela 1 · Entrada Principal
+        </p>
+        <h1 id="titulo-tela-1" class="mt-1 text-2xl font-extrabold text-[#111827] sm:text-3xl">
+          Feira Sustentável - Painel Administrativo
+        </h1>
+        <p class="mt-2 text-sm text-[#374151]">
+          Autenticação segura da coordenação para controle de estoque, vendas e repasses.
+          Nenhum dado pessoal de consumidores é coletado.
+        </p>
+      </div>
+
+      <!-- Caixa de Erro de Validação (Ícone + Texto descritivo) -->
+      <div
+        id="login-error-box"
+        role="alert"
+        aria-live="assertive"
+        class="mt-5 hidden items-start gap-3 rounded-xl border border-[#FCA5A5] bg-[#FEF2F2] p-4 text-sm font-semibold text-[#991B1B]"
+      >
+        <svg class="mt-0.5 h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+        </svg>
+        <span id="login-error-text"></span>
+      </div>
+
+      <form id="login-form" novalidate class="mt-6 space-y-5">
+        <!-- Campo: E-mail do Coordenador -->
+        <div>
+          <label for="email-coordenador" class="mb-2 block text-sm font-bold text-[#111827]">
+            E-mail do Coordenador
+          </label>
+          <input
+            id="email-coordenador"
+            name="email"
+            type="email"
+            autocomplete="email"
+            required
+            placeholder="coordenacao@feirasustentavel.org"
+            class="min-h-[48px] w-full rounded-xl border-2 border-[#9CA3AF] bg-white px-4 text-base text-[#111827] placeholder:text-[#6B7280] focus:border-[#14532D]"
+          />
+        </div>
+
+        <!-- Campo: Senha com Alternância de Visibilidade (Alvo tátil >= 48x48px) -->
+        <div>
+          <label for="senha-coordenador" class="mb-2 block text-sm font-bold text-[#111827]">
+            Senha de Acesso
+          </label>
+          <div class="relative flex items-center">
+            <input
+              id="senha-coordenador"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required
+              placeholder="Digite sua senha"
+              class="min-h-[48px] w-full rounded-xl border-2 border-[#9CA3AF] bg-white pl-4 pr-14 text-base text-[#111827] placeholder:text-[#6B7280] focus:border-[#14532D]"
+            />
+            <button
+              type="button"
+              id="toggle-password-btn"
+              aria-label="Mostrar senha"
+              aria-pressed="false"
+              class="absolute right-1 flex h-[48px] w-[48px] items-center justify-center rounded-lg text-[#374151] hover:bg-[#F3F4F6]"
+            >
+              <!-- Ícone Olho Aberto (Mostrar) -->
+              <svg id="icon-eye-open" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <!-- Ícone Olho Fechado (Ocultar) -->
+              <svg id="icon-eye-closed" class="hidden h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Botão Primário de Alto Contraste (>= 48px) -->
+        <button
+          type="submit"
+          class="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[#14532D] px-6 py-3 text-base font-bold text-white transition-colors hover:bg-[#0F3F22]"
+        >
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+          </svg>
+          <span>Entrar no Sistema</span>
+        </button>
+      </form>
+
+      <!-- Acesso Secundário à Vitrine Pública (Somente Leitura) -->
+      <div class="mt-6 border-t border-[#E5E7EB] pt-5">
+        <button
+          type="button"
+          id="open-vitrine-btn"
+          class="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border-2 border-[#14532D] bg-white px-5 py-3 text-sm font-bold text-[#14532D] transition-colors hover:bg-[#ECFDF5]"
+        >
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
+          </svg>
+          <span>Acessar Vitrine Pública (Somente Leitura)</span>
+        </button>
+      </div>
+
+      <!-- Seção Expansível da Vitrine Pública (Somente Leitura) -->
+      <div
+        id="vitrine-publica-panel"
+        class="mt-6 hidden rounded-xl border border-[#D1D5DB] bg-[#F9FAFB] p-4"
+        aria-labelledby="vitrine-titulo"
+      >
+        <div class="flex items-center justify-between gap-2 border-b border-[#E5E7EB] pb-3">
+          <div>
+            <h2 id="vitrine-titulo" class="text-base font-bold text-[#111827]">
+              Vitrine Digital Pública (Somente Leitura)
+            </h2>
+            <p class="text-xs text-[#374151]">
+              Consulta aberta de produtos e disponibilidade para visitantes da feira.
+            </p>
+          </div>
+          <button
+            type="button"
+            id="close-vitrine-btn"
+            aria-label="Fechar vitrine pública"
+            class="flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg border border-[#D1D5DB] bg-white text-sm font-bold text-[#111827] hover:bg-[#F3F4F6]"
+          >
+            Fechar
+          </button>
+        </div>
+        <ul id="vitrine-lista" class="mt-3 divide-y divide-[#E5E7EB]"></ul>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- TELA 2: REGISTRO DE VENDA E BAIXA AUTOMÁTICA DE ESTOQUE               -->
+    <!-- ===================================================================== -->
+    <section
+      id="tela-2"
+      aria-labelledby="titulo-tela-2"
+      class="mx-auto hidden max-w-2xl rounded-2xl border border-[#D1D5DB] bg-white p-6 shadow-sm sm:p-8"
+    >
+      <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#E5E7EB] pb-5">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-wider text-[#14532D]">
+            Tela 2 · Funcionalidade Central
+          </p>
+          <h1 id="titulo-tela-2" class="mt-1 text-2xl font-extrabold text-[#111827] sm:text-3xl">
+            Registro de Venda e Baixa de Estoque
+          </h1>
+          <p class="mt-1 text-sm text-[#374151]">
+            Selecione o produto, informe a quantidade e confirme para atualizar o saldo.
+          </p>
+        </div>
+
+        <!-- Indicador contextual de sincronização local da Tela 2 -->
+        <div class="inline-flex min-h-[48px] items-center gap-2 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-3.5 py-2 text-xs font-bold text-[#14532D]">
+          <span aria-hidden="true">🟢</span>
+          <span>Online (Service Worker Ativo)</span>
+        </div>
+      </div>
+
+      <!-- Alerta de Erro de Validação da Venda (Ícone + Texto) -->
+      <div
+        id="sale-error-box"
+        role="alert"
+        aria-live="assertive"
+        class="mt-5 hidden items-start gap-3 rounded-xl border border-[#FCA5A5] bg-[#FEF2F2] p-4 text-sm font-semibold text-[#991B1B]"
+      >
+        <svg class="mt-0.5 h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+        </svg>
+        <span id="sale-error-text"></span>
+      </div>
+
+      <form id="sale-form" novalidate class="mt-6 space-y-6">
+        <!-- Select: Selecionar Produto -->
+        <div>
+          <label for="select-produto" class="mb-2 block text-sm font-bold text-[#111827]">
+            Selecionar Produto
+          </label>
+          <select
+            id="select-produto"
+            name="produto"
+            class="min-h-[48px] w-full rounded-xl border-2 border-[#9CA3AF] bg-white px-4 text-base font-medium text-[#111827] focus:border-[#14532D]"
+          ></select>
+        </div>
+
+        <!-- Campo Numérico: Quantidade Vendida + Botões Táteis - / + -->
+        <div>
+          <label for="quantidade-vendida" class="mb-2 block text-sm font-bold text-[#111827]">
+            Quantidade Vendida
+          </label>
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              id="qty-minus-btn"
+              aria-label="Diminuir quantidade em 1"
+              class="flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-xl border-2 border-[#9CA3AF] bg-[#F9FAFB] text-xl font-bold text-[#111827] hover:bg-[#E5E7EB]"
+            >
+              −
+            </button>
+            <input
+              id="quantidade-vendida"
+              name="quantidade"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              step="1"
+              value="2"
+              required
+              class="min-h-[48px] w-full rounded-xl border-2 border-[#9CA3AF] bg-white px-4 text-center text-xl font-extrabold text-[#111827] tabular-nums focus:border-[#14532D]"
+            />
+            <button
+              type="button"
+              id="qty-plus-btn"
+              aria-label="Aumentar quantidade em 1"
+              class="flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-xl border-2 border-[#9CA3AF] bg-[#F9FAFB] text-xl font-bold text-[#111827] hover:bg-[#E5E7EB]"
+            >
+              +
+            </button>
+          </div>
+          <p id="qty-validation-hint" class="mt-2 text-xs font-semibold text-[#374151]" aria-live="polite"></p>
+        </div>
+
+        <!-- Exibição Dinâmica do Subtotal Calculado em Tempo Real -->
+        <div
+          id="subtotal-box"
+          aria-live="polite"
+          class="rounded-xl border border-[#D1D5DB] bg-[#F9FAFB] p-4 sm:p-5"
+        >
+          <p class="text-xs font-bold uppercase tracking-wider text-[#374151]">
+            Resumo Financeiro da Venda
+          </p>
+          <p id="subtotal-display" class="mt-1.5 text-lg font-extrabold text-[#14532D] tabular-nums sm:text-xl">
+            Preço Unitário: R$ 35,00 | Total: R$ 70,00
+          </p>
+        </div>
+
+        <!-- Botão de Ação Principal (>= 48px) -->
+        <button
+          type="submit"
+          id="confirm-sale-btn"
+          class="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[#14532D] px-6 py-3 text-base font-bold text-white transition-colors hover:bg-[#0F3F22] disabled:cursor-not-allowed disabled:bg-[#6B7280]"
+        >
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Confirmar Venda e Atualizar Estoque</span>
+        </button>
+      </form>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- TELA 3: ALERTAS, RESULTADOS E RELATÓRIOS FINANCEIROS                  -->
+    <!-- ===================================================================== -->
+    <section
+      id="tela-3"
+      aria-labelledby="titulo-tela-3"
+      class="mx-auto hidden max-w-3xl space-y-6 rounded-2xl border border-[#D1D5DB] bg-white p-6 shadow-sm sm:p-8"
+    >
+      <div class="border-b border-[#E5E7EB] pb-5">
+        <p class="text-xs font-bold uppercase tracking-wider text-[#14532D]">
+          Tela 3 · Resultados e Repasses
+        </p>
+        <h1 id="titulo-tela-3" class="mt-1 text-2xl font-extrabold text-[#111827] sm:text-3xl">
+          Relatório Consolidado por Produtor
+        </h1>
+        <p class="mt-1 text-sm text-[#374151]">
+          Transparência financeira para prestação de contas junto às famílias associadas.
+        </p>
+      </div>
+
+      <!-- Caixa de Alerta de Sucesso (Ícone + Texto descritivo explícito) -->
+      <div
+        id="success-alert-box"
+        role="status"
+        aria-live="polite"
+        class="flex items-start gap-3 rounded-xl border-2 border-[#14532D] bg-[#ECFDF5] p-4 text-[#14532D]"
+      >
+        <svg class="mt-0.5 h-6 w-6 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+        </svg>
+        <div>
+          <p class="text-base font-extrabold">
+            ✅ Sucesso: Venda registrada e estoque atualizado com segurança.
+          </p>
+          <p id="last-sale-summary" class="mt-1 text-sm font-medium text-[#111827]">
+            Os valores consolidados na tabela abaixo refletem todas as transações confirmadas.
+          </p>
+        </div>
+      </div>
+
+      <!-- Tabela Responsiva de Repasses Financeiros Consolidados -->
+      <div class="overflow-x-auto rounded-xl border border-[#D1D5DB]">
+        <table class="min-w-full divide-y divide-[#D1D5DB] text-left">
+          <caption class="sr-only">
+            Repasses financeiros consolidados por produtor associado da Feira Sustentável
+          </caption>
+          <thead class="bg-[#F9FAFB]">
+            <tr>
+              <th scope="col" class="px-4 py-3.5 text-xs font-extrabold uppercase tracking-wider text-[#111827] sm:px-6">
+                Produtor
+              </th>
+              <th scope="col" class="px-4 py-3.5 text-xs font-extrabold uppercase tracking-wider text-[#111827] sm:px-6">
+                Total de Vendas
+              </th>
+              <th scope="col" class="px-4 py-3.5 text-right text-xs font-extrabold uppercase tracking-wider text-[#111827] sm:px-6">
+                Valor Devido
+              </th>
+            </tr>
+          </thead>
+          <tbody id="repasses-table-body" class="divide-y divide-[#E5E7EB] bg-white"></tbody>
+          <tfoot class="border-t-2 border-[#D1D5DB] bg-[#F9FAFB]">
+            <tr>
+              <th scope="row" class="px-4 py-4 text-sm font-extrabold text-[#111827] sm:px-6">
+                Total Geral da Feira
+              </th>
+              <td id="total-vendas-geral" class="px-4 py-4 text-sm font-bold text-[#374151] tabular-nums sm:px-6">
+                0 vendas
+              </td>
+              <td id="total-valor-geral" class="px-4 py-4 text-right text-base font-extrabold text-[#14532D] tabular-nums sm:px-6">
+                R$ 0,00
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Aviso de feedback após exportação -->
+      <div
+        id="export-feedback"
+        role="status"
+        aria-live="polite"
+        class="hidden items-center gap-2 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm font-bold text-[#14532D]"
+      >
+        <svg class="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+        </svg>
+        <span>Arquivo CSV do relatório consolidado gerado e baixado com sucesso.</span>
+      </div>
+
+      <!-- Botões Inferiores (>= 48px) -->
+      <div class="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
+        <button
+          type="button"
+          id="nova-venda-btn"
+          class="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[#14532D] px-5 py-3 text-base font-bold text-white transition-colors hover:bg-[#0F3F22]"
+        >
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          <span>Registrar Nova Venda</span>
+        </button>
+
+        <button
+          type="button"
+          id="exportar-relatorio-btn"
+          class="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border-2 border-[#14532D] bg-white px-5 py-3 text-base font-bold text-[#14532D] transition-colors hover:bg-[#ECFDF5]"
+        >
+          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+          </svg>
+          <span>Exportar Relatório Consolidado</span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Rodapé Institucional -->
+  <footer class="mx-auto max-w-4xl px-4 pb-8 pt-2 text-center text-xs font-medium text-[#374151] sm:px-6">
+    Associação de Produtores e Artesãos da Feira Sustentável · Alinhado ao ODS 8 (Trabalho Decente e Crescimento Econômico) e WCAG 2.1 AA.
+  </footer>
+
+  <script>
+    /**
+     * Protótipo Interativo PWA - Feira Sustentável
+     * Gerenciamento de estado em memória com separação clara entre catálogo, vendas e repasses.
+     */
+    (function () {
+      'use strict';
+
+      // --- 1. DADOS INICIAIS SIMULADOS (EM CENTAVOS PARA PRECISÃO FINANCEIRA) ---
+      const produtos = [
+        {
+          id: 1,
+          nome: 'Mel Silvestre 500g',
+          produtor: 'João Silva',
+          precoCentavos: 3500,
+          estoque: 15,
+          unidade: 'pote'
+        },
+        {
+          id: 2,
+          nome: 'Cesto Trançado de Taboa',
+          produtor: 'Maria Artesã',
+          precoCentavos: 6400,
+          estoque: 8,
+          unidade: 'un'
+        },
+        {
+          id: 3,
+          nome: 'Tomate Cereja Orgânico (1kg)',
+          produtor: 'Carlos Santos',
+          precoCentavos: 1600,
+          estoque: 20,
+          unidade: 'kg'
+        },
+        {
+          id: 4,
+          nome: 'Sabonete Artesanal de Lavanda',
+          produtor: 'Ana Mendes',
+          precoCentavos: 1400,
+          estoque: 25,
+          unidade: 'un'
+        }
+      ];
+
+      // Repasses acumulados por produtor (valores iniciais realistas)
+      const repassesPorProdutor = [
+        { produtor: 'João Silva', totalVendas: 12, valorDevidoCentavos: 45000 },
+        { produtor: 'Maria Artesã', totalVendas: 5, valorDevidoCentavos: 32000 },
+        { produtor: 'Carlos Santos', totalVendas: 9, valorDevidoCentavos: 18400 },
+        { produtor: 'Ana Mendes', totalVendas: 7, valorDevidoCentavos: 12600 }
+      ];
+
+      // --- 2. REFERÊNCIAS DO DOM ---
+      const screens = {
+        'tela-1': document.getElementById('tela-1'),
+        'tela-2': document.getElementById('tela-2'),
+        'tela-3': document.getElementById('tela-3')
+      };
+      const navButtons = document.querySelectorAll('.nav-tab');
+
+      // Tela 1
+      const loginForm = document.getElementById('login-form');
+      const emailInput = document.getElementById('email-coordenador');
+      const passwordInput = document.getElementById('senha-coordenador');
+      const togglePasswordBtn = document.getElementById('toggle-password-btn');
+      const iconEyeOpen = document.getElementById('icon-eye-open');
+      const iconEyeClosed = document.getElementById('icon-eye-closed');
+      const loginErrorBox = document.getElementById('login-error-box');
+      const loginErrorText = document.getElementById('login-error-text');
+      const openVitrineBtn = document.getElementById('open-vitrine-btn');
+      const closeVitrineBtn = document.getElementById('close-vitrine-btn');
+      const vitrinePanel = document.getElementById('vitrine-publica-panel');
+      const vitrineLista = document.getElementById('vitrine-lista');
+
+      // Tela 2
+      const saleForm = document.getElementById('sale-form');
+      const selectProduto = document.getElementById('select-produto');
+      const qtyInput = document.getElementById('quantidade-vendida');
+      const qtyMinusBtn = document.getElementById('qty-minus-btn');
+      const qtyPlusBtn = document.getElementById('qty-plus-btn');
+      const qtyHint = document.getElementById('qty-validation-hint');
+      const subtotalDisplay = document.getElementById('subtotal-display');
+      const confirmSaleBtn = document.getElementById('confirm-sale-btn');
+      const saleErrorBox = document.getElementById('sale-error-box');
+      const saleErrorText = document.getElementById('sale-error-text');
+
+      // Tela 3
+      const repassesTableBody = document.getElementById('repasses-table-body');
+      const totalVendasGeral = document.getElementById('total-vendas-geral');
+      const totalValorGeral = document.getElementById('total-valor-geral');
+      const lastSaleSummary = document.getElementById('last-sale-summary');
+      const novaVendaBtn = document.getElementById('nova-venda-btn');
+      const exportarRelatorioBtn = document.getElementById('exportar-relatorio-btn');
+      const exportFeedback = document.getElementById('export-feedback');
+
+      // --- 3. UTILITÁRIOS ---
+      function formatBRL(centavos) {
+        return new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL'
+        }).format(centavos / 100);
+      }
+
+      function showScreen(targetId) {
+        Object.keys(screens).forEach((id) => {
+          const el = screens[id];
+          if (id === targetId) {
+            el.classList.remove('hidden');
+          } else {
+            el.classList.add('hidden');
+          }
+        });
+
+        navButtons.forEach((btn) => {
+          const isTarget = btn.getAttribute('data-screen') === targetId;
+          btn.setAttribute('aria-current', isTarget ? 'page' : 'false');
+          if (isTarget) {
+            btn.classList.add('bg-[#14532D]', 'text-white');
+            btn.classList.remove('text-[#111827]', 'hover:bg-[#E5E7EB]');
+          } else {
+            btn.classList.remove('bg-[#14532D]', 'text-white');
+            btn.classList.add('text-[#111827]', 'hover:bg-[#E5E7EB]');
+          }
+        });
+
+        // Move foco para o título principal da tela ativada para leitores de tela
+        const heading = screens[targetId].querySelector('h1');
+        if (heading) {
+          heading.setAttribute('tabindex', '-1');
+          heading.focus({ preventScroll: false });
+        }
+      }
+
+      // --- 4. TELA 1: LÓGICA DE AUTENTICAÇÃO E VITRINE PÚBLICA ---
+      togglePasswordBtn.addEventListener('click', function () {
+        const isPassword = passwordInput.type === 'password';
+        passwordInput.type = isPassword ? 'text' : 'password';
+        togglePasswordBtn.setAttribute('aria-pressed', String(isPassword));
+        togglePasswordBtn.setAttribute(
+          'aria-label',
+          isPassword ? 'Ocultar senha' : 'Mostrar senha'
+        );
+        iconEyeOpen.classList.toggle('hidden', isPassword);
+        iconEyeClosed.classList.toggle('hidden', !isPassword);
+      });
+
+      function renderVitrinePublica() {
+        vitrineLista.innerHTML = '';
+        produtos.forEach((item) => {
+          const li = document.createElement('li');
+          li.className = 'flex flex-wrap items-center justify-between gap-2 py-3 text-sm';
+
+          const infoDiv = document.createElement('div');
+          const title = document.createElement('p');
+          title.className = 'font-bold text-[#111827]';
+          title.textContent = item.nome;
+
+          const sub = document.createElement('p');
+          sub.className = 'text-xs text-[#374151]';
+          sub.textContent = `Produtor: ${item.produtor} · Estoque: ${item.estoque} ${item.unidade}`;
+
+          infoDiv.appendChild(title);
+          infoDiv.appendChild(sub);
+
+          const price = document.createElement('span');
+          price.className = 'font-extrabold text-[#14532D] tabular-nums';
+          price.textContent = `${formatBRL(item.precoCentavos)} / ${item.unidade}`;
+
+          li.appendChild(infoDiv);
+          li.appendChild(price);
+          vitrineLista.appendChild(li);
+        });
+      }
+
+      openVitrineBtn.addEventListener('click', function () {
+        renderVitrinePublica();
+        vitrinePanel.classList.remove('hidden');
+      });
+
+      closeVitrineBtn.addEventListener('click', function () {
+        vitrinePanel.classList.add('hidden');
+        openVitrineBtn.focus();
+      });
+
+      loginForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        const email = emailInput.value.trim();
+        const senha = passwordInput.value.trim();
+
+        if (!email) {
+          loginErrorText.textContent = 'Informe o E-mail do Coordenador para acessar o sistema.';
+          loginErrorBox.classList.remove('hidden');
+          loginErrorBox.classList.add('flex');
+          emailInput.focus();
+          return;
+        }
+
+        if (!email.includes('@') || !email.includes('.')) {
+          loginErrorText.textContent = 'Informe um endereço de e-mail institucional válido.';
+          loginErrorBox.classList.remove('hidden');
+          loginErrorBox.classList.add('flex');
+          emailInput.focus();
+          return;
+        }
+
+        if (!senha) {
+          loginErrorText.textContent = 'Informe a senha de acesso da coordenação.';
+          loginErrorBox.classList.remove('hidden');
+          loginErrorBox.classList.add('flex');
+          passwordInput.focus();
+          return;
+        }
+
+        loginErrorBox.classList.add('hidden');
+        loginErrorBox.classList.remove('flex');
+        showScreen('tela-2');
+      });
+
+      // --- 5. TELA 2: REGISTRO DE VENDA E VALIDAÇÃO EM TEMPO REAL ---
+      function renderProductOptions() {
+        const previousValue = selectProduto.value;
+        selectProduto.innerHTML = '';
+
+        produtos.forEach((p) => {
+          const option = document.createElement('option');
+          option.value = String(p.id);
+          option.textContent = `${p.nome} - Produtor: ${p.produtor} (Estoque: ${p.estoque})`;
+          selectProduto.appendChild(option);
+        });
+
+        if (previousValue && produtos.some((p) => String(p.id) === previousValue)) {
+          selectProduto.value = previousValue;
+        }
+      }
+
+      function getSelectedProduct() {
+        const id = Number(selectProduto.value);
+        return produtos.find((p) => p.id === id) || produtos[0];
+      }
+
+      function validateAndUpdateSubtotal() {
+        const produto = getSelectedProduct();
+        const rawQty = qtyInput.value.trim();
+        const qty = Number(rawQty);
+
+        if (!produto) return false;
+
+        // Cálculo em tempo real mesmo durante digitação
+        const safeQty = Number.isFinite(qty) && qty > 0 ? Math.floor(qty) : 0;
+        const totalCentavos = produto.precoCentavos * safeQty;
+        subtotalDisplay.textContent = `Preço Unitário: ${formatBRL(produto.precoCentavos)} | Total: ${formatBRL(totalCentavos)}`;
+
+        // Validação instantânea
+        if (produto.estoque <= 0) {
+          qtyHint.textContent = 'Atenção: Este produto está sem saldo em estoque.';
+          qtyHint.className = 'mt-2 text-xs font-bold text-[#991B1B]';
+          confirmSaleBtn.disabled = true;
+          return false;
+        }
+
+        if (!rawQty || !Number.isInteger(qty) || qty < 1) {
+          qtyHint.textContent = 'Informe uma quantidade inteira igual ou superior a 1.';
+          qtyHint.className = 'mt-2 text-xs font-bold text-[#991B1B]';
+          confirmSaleBtn.disabled = true;
+          return false;
+        }
+
+        if (qty > produto.estoque) {
+          qtyHint.textContent = `Quantidade excede o saldo disponível (${produto.estoque} em estoque).`;
+          qtyHint.className = 'mt-2 text-xs font-bold text-[#991B1B]';
+          confirmSaleBtn.disabled = true;
+          return false;
+        }
+
+        qtyHint.textContent = `Saldo disponível após esta venda: ${produto.estoque - qty} ${produto.unidade}(s).`;
+        qtyHint.className = 'mt-2 text-xs font-semibold text-[#14532D]';
+        confirmSaleBtn.disabled = false;
+        saleErrorBox.classList.add('hidden');
+        saleErrorBox.classList.remove('flex');
+        return true;
+      }
+
+      selectProduto.addEventListener('change', function () {
+        validateAndUpdateSubtotal();
+      });
+
+      qtyInput.addEventListener('input', function () {
+        validateAndUpdateSubtotal();
+      });
+
+      qtyMinusBtn.addEventListener('click', function () {
+        const current = parseInt(qtyInput.value, 10) || 1;
+        qtyInput.value = String(Math.max(1, current - 1));
+        validateAndUpdateSubtotal();
+      });
+
+      qtyPlusBtn.addEventListener('click', function () {
+        const produto = getSelectedProduct();
+        const current = parseInt(qtyInput.value, 10) || 0;
+        const max = produto ? Math.max(1, produto.estoque) : 99;
+        qtyInput.value = String(Math.min(max, current + 1));
+        validateAndUpdateSubtotal();
+      });
+
+      saleForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (!validateAndUpdateSubtotal()) {
+          saleErrorText.textContent = 'Verifique a quantidade informada antes de confirmar a venda.';
+          saleErrorBox.classList.remove('hidden');
+          saleErrorBox.classList.add('flex');
+          qtyInput.focus();
+          return;
+        }
+
+        const produto = getSelectedProduct();
+        const qty = parseInt(qtyInput.value, 10);
+        const totalCentavos = produto.precoCentavos * qty;
+
+        // Baixa automática no estoque
+        produto.estoque -= qty;
+
+        // Atualização consolidada do repasse do produtor
+        let repasse = repassesPorProdutor.find((r) => r.produtor === produto.produtor);
+        if (!repasse) {
+          repasse = { produtor: produto.produtor, totalVendas: 0, valorDevidoCentavos: 0 };
+          repassesPorProdutor.push(repasse);
+        }
+        repasse.totalVendas += 1;
+        repasse.valorDevidoCentavos += totalCentavos;
+
+        // Atualiza UI das Telas 2 e 3
+        renderProductOptions();
+        validateAndUpdateSubtotal();
+        renderRepassesTable();
+        exportFeedback.classList.add('hidden');
+        exportFeedback.classList.remove('flex');
+
+        lastSaleSummary.textContent =
+          `Lançamento: ${qty}x ${produto.nome} (${produto.produtor}) — Total: ${formatBRL(totalCentavos)}. Saldo restante: ${produto.estoque}.`;
+
+        showScreen('tela-3');
+      });
+
+      // --- 6. TELA 3: RELATÓRIO CONSOLIDADO E EXPORTAÇÃO CSV ---
+      function renderRepassesTable() {
+        repassesTableBody.innerHTML = '';
+        let somaVendas = 0;
+        let somaValorCentavos = 0;
+
+        repassesPorProdutor.forEach((item) => {
+          somaVendas += item.totalVendas;
+          somaValorCentavos += item.valorDevidoCentavos;
+
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-[#F9FAFB]';
+
+          const tdProdutor = document.createElement('td');
+          tdProdutor.className = 'px-4 py-4 text-sm font-bold text-[#111827] sm:px-6';
+          tdProdutor.textContent = item.produtor;
+
+          const tdVendas = document.createElement('td');
+          tdVendas.className = 'px-4 py-4 text-sm font-medium text-[#374151] tabular-nums sm:px-6';
+          tdVendas.textContent = `${item.totalVendas} venda(s)`;
+
+          const tdValor = document.createElement('td');
+          tdValor.className = 'px-4 py-4 text-right text-sm font-extrabold text-[#14532D] tabular-nums sm:px-6';
+          tdValor.textContent = formatBRL(item.valorDevidoCentavos);
+
+          tr.appendChild(tdProdutor);
+          tr.appendChild(tdVendas);
+          tr.appendChild(tdValor);
+          repassesTableBody.appendChild(tr);
+        });
+
+        totalVendasGeral.textContent = `${somaVendas} venda(s)`;
+        totalValorGeral.textContent = formatBRL(somaValorCentavos);
+      }
+
+      novaVendaBtn.addEventListener('click', function () {
+        qtyInput.value = '1';
+        validateAndUpdateSubtotal();
+        showScreen('tela-2');
+      });
+
+      exportarRelatorioBtn.addEventListener('click', function () {
+        const linhas = ['Produtor;Total de Vendas;Valor Devido (R$)'];
+        repassesPorProdutor.forEach((item) => {
+          const valorFormatado = (item.valorDevidoCentavos / 100).toFixed(2).replace('.', ',');
+          linhas.push(`"${item.produtor}";${item.totalVendas};"${valorFormatado}"`);
+        });
+
+        const csvConteudo = '\uFEFF' + linhas.join('\n');
+        const blob = new Blob([csvConteudo], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'relatorio-repasses-feira-sustentavel.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        exportFeedback.classList.remove('hidden');
+        exportFeedback.classList.add('flex');
+      });
+
+      // Navegação manual pelas abas superiores
+      navButtons.forEach((btn) => {
+        btn.addEventListener('click', function () {
+          const target = btn.getAttribute('data-screen');
+          if (target) showScreen(target);
+        });
+      });
+
+      // --- 7. INICIALIZAÇÃO ---
+      renderProductOptions();
+      validateAndUpdateSubtotal();
+      renderRepassesTable();
+    })();
+  </script>
+</body>
+</html>
