@@ -4,6 +4,12 @@ import {
   ProdutoComProdutor,
   ProdutoVitrine,
 } from '../types.ts';
+import {
+  persistPendingSale,
+  readPendingSales,
+  registerSalesBackgroundSync,
+  transmitPendingSales,
+} from './backgroundQueue.ts';
 
 const OFFLINE_SALES_KEY = 'feira_sustentavel_pending_sales_v1';
 const CACHE_VITRINE_KEY = 'feira_sustentavel_cache_vitrine_v1';
@@ -29,10 +35,16 @@ export function savePendingSales(items: OfflineSaleItem[]): void {
   }
 }
 
-export function enqueueOfflineSale(sale: OfflineSaleItem): OfflineSaleItem[] {
+export async function enqueueOfflineSale(sale: OfflineSaleItem): Promise<OfflineSaleItem[]> {
   const current = loadPendingSales();
-  const next = [sale, ...current];
+  const next = [sale, ...current.filter((item) => item.clientSaleId !== sale.clientSaleId)];
   savePendingSales(next);
+  try {
+    await persistPendingSale(sale);
+    void registerSalesBackgroundSync();
+  } catch {
+    // localStorage remains the fallback if IndexedDB is unavailable.
+  }
   return next;
 }
 
@@ -116,44 +128,54 @@ export async function syncOfflineSalesQueue(): Promise<{
   remaining: OfflineSaleItem[];
   lastError: string | null;
 }> {
-  const queue = loadPendingSales();
-  if (queue.length === 0) {
-    return { syncedCount: 0, remaining: [], lastError: null };
-  }
-
-  const chronological = [...queue].reverse();
-  const remaining: OfflineSaleItem[] = [];
+  const legacyQueue = loadPendingSales();
   let syncedCount = 0;
   let lastError: string | null = null;
-
-  for (const item of chronological) {
+  let indexedDbAvailable = true;
+  try {
+    const stored = await readPendingSales();
+    const storedIds = new Set(stored.map((item) => item.clientSaleId));
+    for (const item of legacyQueue) {
+      if (!storedIds.has(item.clientSaleId)) await persistPendingSale(item);
+    }
+  } catch {
+    indexedDbAvailable = false;
+  }
+  if (indexedDbAvailable) {
     try {
-      const response = await fetch('/api/vendas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          produtoId: item.produtoId,
-          quantidade: item.quantidade,
-          clientSaleId: item.clientSaleId,
-        }),
-      });
-
-      if (response.ok) {
-        syncedCount += 1;
-      } else if (response.status === 409 || response.status === 404 || response.status === 400) {
-        const body = await response.json().catch(() => ({}));
-        lastError = body.error || 'Conflito ao sincronizar uma venda offline.';
-        // Keep failed validation item out or retain for user awareness? Retain only on transient/network; drop invalid after surfacing error? Better: drop 4xx only if conflict? Wait: keeping it would loop forever, so report and remove or keep? Let's keep network failures, drop unrecoverable 4xx with explicit error message.
-      } else {
-        remaining.unshift(item);
-        lastError = 'Servidor indisponível durante a sincronização.';
-      }
+      syncedCount = await transmitPendingSales();
     } catch {
-      remaining.unshift(item);
       lastError = 'Sem conexão para concluir a sincronização.';
     }
+  } else {
+    const remainingLegacy: OfflineSaleItem[] = [];
+    for (const item of [...legacyQueue].reverse()) {
+      try {
+        const response = await fetch('/api/vendas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            produtoId: item.produtoId,
+            quantidade: item.quantidade,
+            clientSaleId: item.clientSaleId,
+          }),
+        });
+        if (response.ok) syncedCount += 1;
+        else if (response.status >= 500) remainingLegacy.unshift(item);
+      } catch {
+        remainingLegacy.unshift(item);
+        lastError = 'Sem conexão para concluir a sincronização.';
+      }
+    }
+    savePendingSales(remainingLegacy);
+    return { syncedCount, remaining: remainingLegacy, lastError };
   }
-
+  let remaining: OfflineSaleItem[];
+  try {
+    remaining = await readPendingSales();
+  } catch {
+    remaining = legacyQueue;
+  }
   savePendingSales(remaining);
   return { syncedCount, remaining, lastError };
 }
