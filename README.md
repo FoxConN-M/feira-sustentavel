@@ -202,3 +202,7 @@ npm run lint
 npm test
 npm run build
 ```
+
+## Integração contínua
+
+O workflow do GitHub Actions em `.github/workflows/ci.yml` roda automaticamente em cada push e pull request, e também pode ser iniciado manualmente pela aba **Actions** do repositório. Em um único job, ele instala Node.js 22 e Python 3.11, instala as dependências e executa lint/type-check, testes da API e build do PWA. A suíte usa SQLite e não precisa de credenciais ou serviços externos.
