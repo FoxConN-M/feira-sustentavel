@@ -1,0 +1,67 @@
+name: Status monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: read
+
+concurrency:
+  group: status-monitor-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pwa:
+    name: PWA
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve GitHub Pages URL
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Check PWA availability
+        env:
+          PWA_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$PWA_URL" ]]; then
+            echo "GitHub Pages não retornou uma URL para o PWA."
+            exit 1
+          fi
+          curl --fail --silent --show-error --location --max-time 25 "$PWA_URL/" --output /dev/null
+
+  api:
+    name: API
+    if: >-
+      github.ref_name == github.event.repository.default_branch &&
+      (vars.STATUS_API_HEALTH_URL != '' || vars.VITE_API_BASE_URL != '')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check API health and database connectivity
+        env:
+          STATUS_API_HEALTH_URL: ${{ vars.STATUS_API_HEALTH_URL }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          export API_HEALTH_URL="${STATUS_API_HEALTH_URL:-}"
+          if [[ -z "$API_HEALTH_URL" ]]; then
+            export API_HEALTH_URL="${VITE_API_BASE_URL%/}/api/health"
+          fi
+          python - <<'PY'
+          import json
+          import os
+          from urllib.request import urlopen
+
+          url = os.environ["API_HEALTH_URL"]
+          with urlopen(url, timeout=25) as response:
+              if response.status != 200:
+                  raise SystemExit(f"API retornou HTTP {response.status}")
+              payload = json.load(response)
+          if payload.get("ok") is not True:
+              raise SystemExit("API ou banco de dados não confirmou estado saudável")
+          print(f"API saudável: {url}")
+          PY
