@@ -206,3 +206,17 @@ npm run build
 ## Integração contínua
 
 O workflow do GitHub Actions em `.github/workflows/ci.yml` roda automaticamente em cada push e pull request, e também pode ser iniciado manualmente pela aba **Actions** do repositório. Em um único job, ele instala Node.js 22 e Python 3.11, instala as dependências e executa lint/type-check, testes da API e build do PWA. A suíte usa SQLite e não precisa de credenciais ou serviços externos.
+
+## Publicação no GitHub Pages
+
+O workflow `.github/workflows/deploy-pages.yml` compila e publica o frontend PWA no GitHub Pages sempre que há push na branch padrão. O caminho base do site é detectado pelo GitHub Actions, então os arquivos, ícones, manifesto e Service Worker funcionam tanto em um domínio próprio quanto em um endereço de projeto (`usuario.github.io/nome-do-repositorio/`).
+
+Para ativar a publicação:
+
+1. No repositório GitHub, abra **Settings → Pages** e selecione **GitHub Actions** como fonte de publicação.
+2. Envie estes arquivos à branch padrão. O workflow fará o build e publicará o artefato `dist`.
+3. Consulte a URL publicada no job **Deploy GitHub Pages**, no ambiente `github-pages`.
+
+O GitHub Pages serve conteúdo estático e não hospeda a API FastAPI. Sem configuração adicional, a versão publicada entra no **modo demonstração local**: disponibiliza as 15 famílias e 45 produtos de exemplo, e grava vendas, mudanças de estoque e relatórios no armazenamento do navegador usado. Esses dados não são enviados ao servidor nem compartilhados entre dispositivos.
+
+Para usar dados compartilhados e persistentes, hospede a API FastAPI e PostgreSQL em um serviço separado. Depois, crie a variável de repositório `VITE_API_BASE_URL` com a origem HTTPS da API (por exemplo, `https://api.exemplo.org`, sem `/api` no final). Configure também `CORS_ORIGINS` no backend com a origem exata do GitHub Pages, como `https://usuario.github.io`. O workflow lê `VITE_API_BASE_URL` durante o build e publica uma versão conectada à API. Não coloque segredos de backend em variáveis `VITE_*`, pois elas ficam públicas no JavaScript compilado.

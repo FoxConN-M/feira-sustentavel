@@ -27,7 +27,7 @@ registerRoute(
   })
 );
 registerRoute(
-  ({ url }) => url.pathname === '/api/vitrine',
+  ({ url }) => url.pathname.endsWith('/api/vitrine'),
   new NetworkFirst({
     cacheName: 'vitrine-api-cache',
     networkTimeoutSeconds: 3,
